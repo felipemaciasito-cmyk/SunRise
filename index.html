@@ -1,0 +1,116 @@
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101114">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="SunRise">
+  <title>SunRise</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #101114;
+      color: #f7f4ef;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      padding: 28px 22px;
+    }
+    main { max-width: 520px; margin: auto; }
+    .top { display:flex; justify-content:space-between; align-items:center; }
+    .brand { font-size: 23px; font-weight: 700; letter-spacing: -.7px; }
+    .status { color:#9b9ba3; font-size:12px; }
+    .sun {
+      margin: 54px auto 28px;
+      width: 180px; height: 180px; border-radius: 50%;
+      background: radial-gradient(circle at 50% 60%, #ffd98b 0%, #ff9b62 35%, #d94d4d 62%, #642f50 78%, #101114 79%);
+      box-shadow: 0 0 70px #ff8b5430;
+    }
+    .label { color:#a5a4ad; font-size:13px; text-transform:uppercase; letter-spacing:2px; }
+    .time { font-size:68px; font-weight:300; letter-spacing:-3px; margin:8px 0; }
+    .center { text-align:center; }
+    .card {
+      margin-top:30px; padding:22px; border-radius:22px;
+      background:#1b1c21; border:1px solid #303138;
+    }
+    .alarm { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .alarm strong { display:block; font-size:17px; margin-bottom:5px; }
+    .muted { color:#9b9ba3; font-size:13px; }
+    button {
+      border:0; border-radius:14px; padding:13px 18px;
+      background:#ffad72; color:#20130d; font-size:14px; font-weight:700;
+    }
+    .secondary { background:#303138; color:#f7f4ef; }
+    .actions { display:flex; gap:10px; margin-top:18px; }
+    .actions button { flex:1; }
+    .note { color:#888891; font-size:12px; line-height:1.5; margin-top:20px; }
+    #message { color:#ffbd91; font-size:13px; margin-top:14px; }
+  </style>
+</head>
+<body>
+  <main>
+    <header class="top">
+      <div class="brand">SunRise</div>
+      <div class="status">PERSONAL ALARM</div>
+    </header>
+
+    <div class="sun"></div>
+
+    <section class="center">
+      <div class="label">Heure actuelle</div>
+      <div class="time" id="clock">--:--</div>
+      <div class="muted">Un réveil plus naturel</div>
+    </section>
+
+    <section class="card">
+      <div class="alarm">
+        <div>
+          <strong>Mon réveil</strong>
+          <div class="muted">Heure de réveil</div>
+        </div>
+        <input id="alarmTime" type="time" value="07:00"
+          style="background:#303138;color:white;border:0;border-radius:10px;padding:10px;font-size:16px">
+      </div>
+      <div class="actions">
+        <button id="save">Enregistrer</button>
+        <button id="connect" class="secondary">Connexion Bluetooth</button>
+      </div>
+      <div id="message" role="status"></div>
+    </section>
+
+    <p class="note">
+      Version web de SunRise. L’enregistrement conserve l’heure sur cet appareil.
+      La connexion au réveil Niditon n’est pas encore implémentée.
+    </p>
+  </main>
+
+  <script>
+    function updateClock() {
+      document.getElementById("clock").textContent =
+        new Intl.DateTimeFormat("fr-FR", {
+          hour: "2-digit", minute: "2-digit"
+        }).format(new Date());
+    }
+    updateClock();
+    setInterval(updateClock, 1000);
+
+    const input = document.getElementById("alarmTime");
+    const message = document.getElementById("message");
+    const saved = localStorage.getItem("sunrise-alarm");
+    if (saved) input.value = saved;
+
+    document.getElementById("save").addEventListener("click", () => {
+      localStorage.setItem("sunrise-alarm", input.value);
+      message.textContent = "Heure enregistrée : " + input.value;
+    });
+
+    document.getElementById("connect").addEventListener("click", () => {
+      message.textContent =
+        "La connexion Bluetooth sera ajoutée dans une prochaine étape.";
+    });
+  </script>
+</body>
+</html>
