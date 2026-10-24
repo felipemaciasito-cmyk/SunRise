@@ -1,9 +1,8 @@
-
 <!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#101114">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -11,105 +10,152 @@
   <title>SunRise</title>
   <style>
     * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      background: #101114;
-      color: #f7f4ef;
-      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-      padding: 28px 22px;
-    }
+    body { margin: 0; min-height: 100vh; background: #101114; color: #f7f4ef; font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: max(28px, env(safe-area-inset-top)) 22px max(28px, env(safe-area-inset-bottom)); }
     main { max-width: 520px; margin: auto; }
     .top { display:flex; justify-content:space-between; align-items:center; }
     .brand { font-size: 23px; font-weight: 700; letter-spacing: -.7px; }
     .status { color:#9b9ba3; font-size:12px; }
-    .sun {
-      margin: 54px auto 28px;
-      width: 180px; height: 180px; border-radius: 50%;
-      background: radial-gradient(circle at 50% 60%, #ffd98b 0%, #ff9b62 35%, #d94d4d 62%, #642f50 78%, #101114 79%);
-      box-shadow: 0 0 70px #ff8b5430;
-    }
+    .sun { margin: 54px auto 28px; width: 180px; height: 180px; border-radius: 50%; background: radial-gradient(circle at 50% 60%, #ffd98b 0%, #ff9b62 35%, #d94d4d 62%, #642f50 78%, #101114 79%); box-shadow: 0 0 70px #ff8b5430; }
     .label { color:#a5a4ad; font-size:13px; text-transform:uppercase; letter-spacing:2px; }
     .time { font-size:68px; font-weight:300; letter-spacing:-3px; margin:8px 0; }
     .center { text-align:center; }
-    .card {
-      margin-top:30px; padding:22px; border-radius:22px;
-      background:#1b1c21; border:1px solid #303138;
-    }
+    .card { margin-top:30px; padding:22px; border-radius:22px; background:#1b1c21; border:1px solid #303138; }
     .alarm { display:flex; align-items:center; justify-content:space-between; gap:12px; }
     .alarm strong { display:block; font-size:17px; margin-bottom:5px; }
     .muted { color:#9b9ba3; font-size:13px; }
-    button {
-      border:0; border-radius:14px; padding:13px 18px;
-      background:#ffad72; color:#20130d; font-size:14px; font-weight:700;
-    }
+    button { border:0; border-radius:14px; padding:13px 18px; background:#ffad72; color:#20130d; font-size:14px; font-weight:700; cursor:pointer; }
+    button:disabled { opacity:.6; cursor:wait; }
     .secondary { background:#303138; color:#f7f4ef; }
     .actions { display:flex; gap:10px; margin-top:18px; }
     .actions button { flex:1; }
     .note { color:#888891; font-size:12px; line-height:1.5; margin-top:20px; }
-    #message { color:#ffbd91; font-size:13px; margin-top:14px; }
+    #message { color:#ffbd91; font-size:13px; line-height:1.5; margin-top:14px; overflow-wrap:anywhere; }
+    #details { color:#c6c5cc; font-size:12px; line-height:1.5; white-space:pre-wrap; overflow-wrap:anywhere; margin-top:10px; }
+    @media (max-width: 420px) { .actions { flex-direction:column; } .sun { margin-top:38px; } }
   </style>
 </head>
 <body>
   <main>
     <header class="top">
       <div class="brand">SunRise</div>
-      <div class="status">PERSONAL ALARM</div>
+      <div class="status" id="connectionStatus">NON CONNECTÉ</div>
     </header>
-
-    <div class="sun"></div>
-
+    <div class="sun" aria-hidden="true"></div>
     <section class="center">
       <div class="label">Heure actuelle</div>
       <div class="time" id="clock">--:--</div>
       <div class="muted">Un réveil plus naturel</div>
     </section>
-
     <section class="card">
       <div class="alarm">
-        <div>
-          <strong>Mon réveil</strong>
-          <div class="muted">Heure de réveil</div>
-        </div>
-        <input id="alarmTime" type="time" value="07:00"
-          style="background:#303138;color:white;border:0;border-radius:10px;padding:10px;font-size:16px">
+        <div><strong>Mon réveil</strong><div class="muted">Heure de réveil</div></div>
+        <input id="alarmTime" type="time" value="07:00" aria-label="Heure de réveil" style="background:#303138;color:white;border:0;border-radius:10px;padding:10px;font-size:16px">
       </div>
       <div class="actions">
         <button id="save">Enregistrer</button>
         <button id="connect" class="secondary">Connexion Bluetooth</button>
       </div>
-      <div id="message" role="status"></div>
+      <div id="message" role="status" aria-live="polite">Prêt à rechercher le réveil.</div>
+      <div id="details"></div>
     </section>
-
-    <p class="note">
-      Version web de SunRise. L’enregistrement conserve l’heure sur cet appareil.
-      La connexion au réveil Niditon n’est pas encore implémentée.
-    </p>
+    <p class="note">SunRise Web BLE. La connexion et la détection des caractéristiques sont testées ici. Les commandes de réglage du réveil ne sont pas encore envoyées, car leur format doit être confirmé.</p>
   </main>
-
   <script>
+    const message = document.getElementById('message');
+    const details = document.getElementById('details');
+    const connectButton = document.getElementById('connect');
+    const connectionStatus = document.getElementById('connectionStatus');
+    let connectedDevice = null;
+    let gattServer = null;
+
     function updateClock() {
-      document.getElementById("clock").textContent =
-        new Intl.DateTimeFormat("fr-FR", {
-          hour: "2-digit", minute: "2-digit"
-        }).format(new Date());
+      document.getElementById('clock').textContent = new Intl.DateTimeFormat('fr-FR', {hour:'2-digit', minute:'2-digit'}).format(new Date());
     }
     updateClock();
     setInterval(updateClock, 1000);
 
-    const input = document.getElementById("alarmTime");
-    const message = document.getElementById("message");
-    const saved = localStorage.getItem("sunrise-alarm");
+    const input = document.getElementById('alarmTime');
+    const saved = localStorage.getItem('sunrise-alarm');
     if (saved) input.value = saved;
-
-    document.getElementById("save").addEventListener("click", () => {
-      localStorage.setItem("sunrise-alarm", input.value);
-      message.textContent = "Heure enregistrée : " + input.value;
+    document.getElementById('save').addEventListener('click', () => {
+      localStorage.setItem('sunrise-alarm', input.value);
+      message.textContent = 'Heure enregistrée localement : ' + input.value + '. Elle n’a pas encore été envoyée au réveil.';
     });
 
-    document.getElementById("connect").addEventListener("click", () => {
-      message.textContent =
-        "La connexion Bluetooth sera ajoutée dans une prochaine étape.";
+    function formatError(error) {
+      if (!error) return 'Erreur inconnue';
+      if (error.name === 'NotFoundError') return 'Aucun appareil sélectionné. Relance la recherche et sélectionne le réveil.';
+      if (error.name === 'NotSupportedError') return 'Cette version du navigateur ne prend pas en charge Web Bluetooth. Ouvre le site dans Bluefy.';
+      if (error.name === 'SecurityError') return 'Accès Bluetooth bloqué par le contexte de sécurité ou les autorisations du navigateur.';
+      if (error.name === 'NetworkError') return 'Connexion GATT impossible ou interrompue. Vérifie que le réveil est allumé et non connecté à une autre application.';
+      return (error.name ? error.name + ': ' : '') + error.message;
+    }
+
+    async function inspectDevice(device) {
+      message.textContent = 'Connexion à ' + (device.name || 'l’appareil sélectionné') + '…';
+      details.textContent = '';
+      device.addEventListener('gattserverdisconnected', () => {
+        gattServer = null;
+        connectionStatus.textContent = 'DÉCONNECTÉ';
+        message.textContent = 'La connexion Bluetooth a été interrompue.';
+      });
+      if (!device.gatt) throw new Error('Cet appareil ne fournit pas de connexion GATT.');
+      gattServer = await device.gatt.connect();
+      connectedDevice = device;
+      connectionStatus.textContent = 'CONNECTÉ';
+      message.textContent = 'Connecté à ' + (device.name || 'l’appareil') + '. Lecture des services…';
+
+      const services = await gattServer.getPrimaryServices();
+      const lines = [];
+      for (const service of services) {
+        lines.push('Service : ' + service.uuid);
+        let characteristics;
+        try {
+          characteristics = await service.getCharacteristics();
+        } catch (error) {
+          lines.push('  Lecture des caractéristiques impossible : ' + formatError(error));
+          continue;
+        }
+        for (const characteristic of characteristics) {
+          const p = characteristic.properties;
+          const caps = [];
+          if (p.read) caps.push('lecture');
+          if (p.write) caps.push('écriture');
+          if (p.writeWithoutResponse) caps.push('écriture sans réponse');
+          if (p.notify) caps.push('notifications');
+          if (p.indicate) caps.push('indications');
+          lines.push('  ' + characteristic.uuid + ' — ' + (caps.join(', ') || 'aucune propriété signalée'));
+        }
+      }
+      details.textContent = lines.join('\n');
+      message.textContent = 'Connexion établie. ' + services.length + ' service(s) principal(aux) détecté(s). Aucun ordre de contrôle n’a été envoyé.';
+    }
+
+    connectButton.addEventListener('click', async () => {
+      details.textContent = '';
+      if (!navigator.bluetooth || typeof navigator.bluetooth.requestDevice !== 'function') {
+        message.textContent = 'Web Bluetooth indisponible dans ce navigateur. Vérifie que cette page est ouverte dans Bluefy et recharge-la.';
+        return;
+      }
+      connectButton.disabled = true;
+      try {
+        if (connectedDevice && connectedDevice.gatt && connectedDevice.gatt.connected) {
+          connectedDevice.gatt.disconnect();
+          connectedDevice = null;
+          gattServer = null;
+          connectionStatus.textContent = 'NON CONNECTÉ';
+        }
+        message.textContent = 'Choisis le réveil dans la fenêtre Bluetooth…';
+        const device = await navigator.bluetooth.requestDevice({
+          filters: [{services: ['ae30']}, {services: ['ae3a']}, {services: ['af30']}],
+          optionalServices: ['ae30', 'ae3a', 'af30']
+        });
+        await inspectDevice(device);
+      } catch (error) {
+        message.textContent = 'Bluetooth : ' + formatError(error);
+      } finally {
+        connectButton.disabled = false;
+      }
     });
   </script>
 </body>
