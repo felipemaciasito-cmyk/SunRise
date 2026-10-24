@@ -1,0 +1,54 @@
+import SwiftUI
+import CoreBluetooth
+
+@main struct SunRiseApp: App { var body: some Scene { WindowGroup { MainView() } } }
+
+struct MainView: View {
+ @StateObject private var ble = SunriseBLE()
+ @State private var tab = 0
+ @State private var brightness = 70.0
+ @State private var color = 0
+ private let swatches: [Color] = [.orange, Color(red:1,green:0.72,blue:0.48), .yellow, .white, .cyan, .purple, .pink]
+ var body: some View {
+  ZStack { Color(red:0.035,green:0.045,blue:0.065).ignoresSafeArea(); VStack(spacing:0) {
+   HStack { VStack(alignment:.leading,spacing:4) { Text("N I D I T O N").font(.system(size:11,weight:.semibold)).tracking(2.5).foregroundStyle(.white.opacity(0.55)); Text("Sunrise").font(.system(size:30,weight:.semibold)) }; Spacer(); Circle().fill(ble.connected ? .green : .orange).frame(width:8,height:8); Text(ble.connected ? "Connecté" : ble.status).font(.caption).foregroundStyle(.white.opacity(0.7)).lineLimit(1) }.padding(.horizontal,22).padding(.top,14)
+   ScrollView { Group { if tab == 0 { home } else if tab == 1 { light } else if tab == 2 { alarms } else { diagnostics } }.padding(16) }.padding(.top,8)
+   HStack { nav("Accueil","house.fill",0); nav("Lumière","sun.max.fill",1); nav("Alarmes","alarm.fill",2); nav("Plus","ellipsis",3) }.padding(.top,12).padding(.bottom,8).background(.black.opacity(0.35))
+  } }.preferredColorScheme(.dark).onAppear { ble.startScan() }
+ }
+ var home: some View { VStack(spacing:15) {
+  ZStack { Circle().fill(RadialGradient(colors:[.orange.opacity(0.8),.orange.opacity(0.2),.clear],center:.center,startRadius:5,endRadius:130)).frame(width:260,height:260).blur(radius:10); Circle().fill(LinearGradient(colors:[Color(red:1,green:0.84,blue:0.66),Color(red:0.94,green:0.48,blue:0.24)],startPoint:.topLeading,endPoint:.bottomTrailing)).frame(width:136,height:136).shadow(color:.orange.opacity(0.3),radius:24); Text("07:30").font(.system(.title3,design:.monospaced)).offset(y:42) }.frame(height:230)
+  HStack { quick("Éveil","sunrise.fill"){tab=2}; quick("Détente","moon.fill"){tab=1}; quick("Lecture","book.fill"){tab=1}; quick("Ambiance","sparkles"){tab=1} }
+  panel { HStack { Label("Luminosité",systemImage:"sun.max.fill"); Spacer(); Text("\(Int(brightness))%").foregroundStyle(.white.opacity(0.6)) }; Slider(value:$brightness,in:0...100,onEditingChanged:{ if !$0 { ble.log("Luminosité \(Int(brightness))% : commande non validée") } }).tint(.orange) }
+  panel { HStack { Text("Couleur"); Spacer(); Text("Ambre").font(.caption).foregroundStyle(.white.opacity(0.6)) }; swatchRow }
+  panel { HStack { Label("Bluetooth",systemImage:"dot.radiowaves.left.and.right"); Spacer(); Button(ble.connected ? "Déconnecter":"Rechercher") { ble.connected ? ble.disconnect() : ble.startScan() }.tint(.orange) } }
+ }.foregroundStyle(.white) }
+ var light: some View { VStack(spacing:15) { panel { Text("Lumière").font(.title2.bold()); Text("Couleur").foregroundStyle(.white.opacity(0.7)); ZStack { Circle().fill(AngularGradient(colors:[.orange,.yellow,.white,.cyan,.blue,.purple,.pink,.orange],center:.center)).frame(width:225,height:225); Circle().fill(Color(red:0.07,green:0.08,blue:0.11)).frame(width:80,height:80) }.frame(maxWidth:.infinity); swatchRow; HStack { Text("Luminosité"); Spacer(); Text("\(Int(brightness))%") }; Slider(value:$brightness,in:0...100,onEditingChanged:{if !$0 {ble.log("Luminosité : paquet à valider")}}).tint(.orange) }; panel { Text("Effets").font(.headline); Text("Les commandes d’effets seront activées après validation du protocole BLE du modèle.").foregroundStyle(.white.opacity(0.6)) } }.foregroundStyle(.white) }
+ var alarms: some View { VStack(spacing:15) { panel { HStack { Text("Alarmes").font(.title2.bold()); Spacer(); Image(systemName:"plus.circle.fill").foregroundStyle(.orange) }; Text("Le format BLE des alarmes doit encore être confirmé sur le réveil.").foregroundStyle(.white.opacity(0.65)) }; panel { Label("Étape suivante",systemImage:"checkmark.circle").foregroundStyle(.orange); Text("Connecter le réveil et capturer les notifications avant d’activer l’envoi des alarmes.").foregroundStyle(.white.opacity(0.65)) } }.foregroundStyle(.white) }
+ var diagnostics: some View { VStack(spacing:15) { panel { Text("Bluetooth LE").font(.title2.bold()); Text(ble.status).foregroundStyle(.orange); Button(ble.connected ? "Déconnecter":"Rechercher le réveil") { ble.connected ? ble.disconnect() : ble.startScan() }.buttonStyle(.borderedProminent).tint(.orange); if !ble.devices.isEmpty { Text("Périphériques détectés").font(.headline); ForEach(ble.devices) { d in Button { ble.connect(d) } label: { HStack { VStack(alignment:.leading) { Text(d.name); Text(d.id.uuidString).font(.caption2).foregroundStyle(.white.opacity(0.45)) }; Spacer(); Image(systemName:"chevron.right") }.padding(10).background(.white.opacity(0.05)).clipShape(RoundedRectangle(cornerRadius:12)) }.foregroundStyle(.white) } } }; panel { Text("Caractéristiques").font(.headline); if ble.characteristics.isEmpty { Text("Aucune caractéristique reçue.").foregroundStyle(.white.opacity(0.5)) }; ForEach(ble.characteristics,id:\.self) { Text($0).font(.system(.caption,design:.monospaced)).foregroundStyle(.white.opacity(0.7)) } }; panel { Text("Notifications reçues").font(.headline); if ble.logs.isEmpty { Text("Les données reçues s’afficheront ici.").foregroundStyle(.white.opacity(0.5)) }; ForEach(Array(ble.logs.enumerated()),id:\.offset) { _,line in Text(line).font(.system(.caption,design:.monospaced)).frame(maxWidth:.infinity,alignment:.leading).foregroundStyle(.white.opacity(0.7)) } }; panel { Text("Protocole en cours d’identification").font(.headline); Text("Les identifiants extraits de Halo Light ne suffisent pas à valider le paquet complet. Aucun paquet de commande spéculatif n’est envoyé.").foregroundStyle(.white.opacity(0.65)) } }.foregroundStyle(.white) }
+ var swatchRow: some View { HStack(spacing:13) { ForEach(swatches.indices,id:\.self) { i in Circle().fill(swatches[i]).frame(width:24,height:24).overlay(Circle().stroke(.white,lineWidth:color == i ? 2 : 0).padding(-3)).onTapGesture { color=i; ble.log("Mode couleur \(i) : commande non validée") } } } }
+ func panel<C:View>(@ViewBuilder _ content:()->C)->some View { VStack(alignment:.leading,spacing:13,content:content).padding(16).frame(maxWidth:.infinity,alignment:.leading).background(Color(red:0.075,green:0.085,blue:0.11)).overlay(RoundedRectangle(cornerRadius:19).stroke(.white.opacity(0.06))).clipShape(RoundedRectangle(cornerRadius:19)) }
+ func quick(_ title:String,_ icon:String,action:@escaping()->Void)->some View { Button(action:action) { VStack(spacing:7) { Image(systemName:icon); Text(title).font(.caption2) }.frame(maxWidth:.infinity).padding(.vertical,13).background(Color(red:0.15,green:0.12,blue:0.1)).clipShape(RoundedRectangle(cornerRadius:13)) }.foregroundStyle(.white) }
+ func nav(_ title:String,_ icon:String,_ i:Int)->some View { Button { tab=i } label:{ VStack(spacing:5){Image(systemName:icon);Text(title).font(.system(size:10,weight:.medium))}.foregroundStyle(tab == i ? Color.orange : Color.white.opacity(0.45)).frame(maxWidth:.infinity) } }
+}
+
+struct SunriseDevice: Identifiable { let id:UUID; let name:String; let peripheral:CBPeripheral }
+final class SunriseBLE: NSObject,ObservableObject,CBCentralManagerDelegate,CBPeripheralDelegate {
+ @Published var status="Initialisation Bluetooth…"; @Published var connected=false; @Published var devices:[SunriseDevice]=[]; @Published var characteristics:[String]=[]; @Published var logs:[String]=[]
+ private var central:CBCentralManager!; private var active:CBPeripheral?
+ override init(){super.init();central=CBCentralManager(delegate:self,queue:.main)}
+ func startScan(){guard central.state == .poweredOn else {status="Active le Bluetooth";return};devices=[];status="Recherche du Sunrise…";central.scanForPeripherals(withServices:nil,options:[CBCentralManagerScanOptionAllowDuplicatesKey:false])}
+ func centralManagerDidUpdateState(_ central:CBCentralManager){if central.state == .poweredOn{startScan()}else{status="Bluetooth indisponible"}}
+ func centralManager(_ central:CBCentralManager,didDiscover p:CBPeripheral,advertisementData:[String:Any],rssi:NSNumber){let n=p.name ?? advertisementData[CBAdvertisementDataLocalNameKey] as? String ?? "Périphérique sans nom";guard n.localizedCaseInsensitiveContains("sunrise") || n.localizedCaseInsensitiveContains("niditon") || n.localizedCaseInsensitiveContains("halo") || advertisementData[CBAdvertisementDataServiceUUIDsKey] != nil else{return};if !devices.contains(where:{$0.id == p.identifier}){devices.append(SunriseDevice(id:p.identifier,name:n,peripheral:p))};if n.localizedCaseInsensitiveContains("sunrise"){status="Réveil détecté : \(n)"}}
+ func connect(_ d:SunriseDevice){central.stopScan();active=d.peripheral;active?.delegate=self;status="Connexion à \(d.name)…";central.connect(d.peripheral)}
+ func disconnect(){if let active{central.cancelPeripheralConnection(active)}}
+ func centralManager(_ central:CBCentralManager,didConnect p:CBPeripheral){connected=true;status="Connecté — lecture des services";p.discoverServices(nil)}
+ func centralManager(_ central:CBCentralManager,didFailToConnect p:CBPeripheral,error:Error?){connected=false;status="Échec : \(error?.localizedDescription ?? "inconnu")"}
+ func centralManager(_ central:CBCentralManager,didDisconnectPeripheral p:CBPeripheral,error:Error?){connected=false;status="Déconnecté"}
+ func peripheral(_ p:CBPeripheral,didDiscoverServices error:Error?){for s in p.services ?? []{p.discoverCharacteristics(nil,for:s)}}
+ func peripheral(_ p:CBPeripheral,didDiscoverCharacteristicsFor s:CBService,error:Error?){for c in s.characteristics ?? []{let line="\(s.uuid.uuidString) / \(c.uuid.uuidString) [\(props(c.properties))]";if !characteristics.contains(line){characteristics.append(line)};if c.properties.contains(.notify) || c.properties.contains(.indicate){p.setNotifyValue(true,for:c)};if c.properties.contains(.read){p.readValue(for:c)}};status="Connecté — \(characteristics.count) caractéristiques"}
+ func peripheral(_ p:CBPeripheral,didUpdateValueFor c:CBCharacteristic,error:Error?){if let error{log("Erreur \(c.uuid): \(error.localizedDescription)");return};if let data=c.value{log("RX \(c.uuid): "+data.map{String(format:"%02X",$0)}.joined(separator:" "))}}
+ func peripheral(_ p:CBPeripheral,didUpdateNotificationStateFor c:CBCharacteristic,error:Error?){log("Notify \(c.uuid): \(error?.localizedDescription ?? (c.isNotifying ? "actif":"inactif"))")}
+ func log(_ s:String){logs.insert(s,at:0);if logs.count>80{logs.removeLast()}}
+ func props(_ p:CBCharacteristicProperties)->String{var a:[String]=[];if p.contains(.read){a.append("R")};if p.contains(.write){a.append("W")};if p.contains(.writeWithoutResponse){a.append("WNR")};if p.contains(.notify){a.append("N")};if p.contains(.indicate){a.append("I")};return a.joined(separator:",")}
+}

@@ -1,0 +1,27 @@
+// !$*UTF8*$!
+{
+ archiveVersion = 1;
+ classes = {};
+ objectVersion = 56;
+ objects = {
+  A10000000000000000000001 /* SunRiseApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SunRiseApp.swift; sourceTree = "<group>"; };
+  A10000000000000000000002 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+  A10000000000000000000003 /* SunRise.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SunRise.app; sourceTree = BUILT_PRODUCTS_DIR; };
+  A10000000000000000000004 /* SunRiseApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000001; };
+  A10000000000000000000005 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000004,); runOnlyForDeploymentPostprocessing = 0; };
+  A10000000000000000000006 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+  A10000000000000000000007 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+  A10000000000000000000008 /* Main group */ = {isa = PBXGroup; children = (A10000000000000000000009, A1000000000000000000000A, A10000000000000000000003,); sourceTree = "<group>"; };
+  A10000000000000000000009 /* SunRise */ = {isa = PBXGroup; path = NiditonControl; sourceTree = "<group>"; children = (A10000000000000000000001, A10000000000000000000002,); };
+  A1000000000000000000000A /* Products */ = {isa = PBXGroup; name = Products; sourceTree = "<group>"; children = (A10000000000000000000003,); };
+  A1000000000000000000000B /* Project object */ = {isa = PBXProject; attributes = {BuildIndependentTargetsInParallel = 1; LastUpgradeCheck = 1600; }; buildConfigurationList = A1000000000000000000000C; compatibilityVersion = "Xcode 14.0"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en, Base, fr,); mainGroup = A10000000000000000000008; productRefGroup = A1000000000000000000000A; projectDirPath = ""; projectRoot = ""; targets = (A1000000000000000000000D,); };
+  A1000000000000000000000D /* SunRise */ = {isa = PBXNativeTarget; buildConfigurationList = A1000000000000000000000E; buildPhases = (A10000000000000000000005, A10000000000000000000006, A10000000000000000000007,); buildRules = (); dependencies = (); name = SunRise; productName = SunRise; productReference = A10000000000000000000003; productType = "com.apple.product-type.application"; };
+  A1000000000000000000000C /* Project configuration list */ = {isa = XCConfigurationList; buildConfigurations = (A1000000000000000000000F, A10000000000000000000010,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+  A1000000000000000000000E /* Target configuration list */ = {isa = XCConfigurationList; buildConfigurations = (A10000000000000000000011, A10000000000000000000012,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+  A1000000000000000000000F /* Project Debug */ = {isa = XCBuildConfiguration; buildSettings = {IPHONEOS_DEPLOYMENT_TARGET = 16.0; SDKROOT = iphoneos; SWIFT_VERSION = 5.0; }; name = Debug; };
+  A10000000000000000000010 /* Project Release */ = {isa = XCBuildConfiguration; buildSettings = {IPHONEOS_DEPLOYMENT_TARGET = 16.0; SDKROOT = iphoneos; SWIFT_VERSION = 5.0; }; name = Release; };
+  A10000000000000000000011 /* Target Debug */ = {isa = XCBuildConfiguration; buildSettings = {GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = NiditonControl/Info.plist; PRODUCT_BUNDLE_IDENTIFIER = com.stani.SunRise; PRODUCT_NAME = SunRise; TARGETED_DEVICE_FAMILY = "1,2"; SWIFT_EMIT_LOC_STRINGS = YES; }; name = Debug; };
+  A10000000000000000000012 /* Target Release */ = {isa = XCBuildConfiguration; buildSettings = {GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = NiditonControl/Info.plist; PRODUCT_BUNDLE_IDENTIFIER = com.stani.SunRise; PRODUCT_NAME = SunRise; TARGETED_DEVICE_FAMILY = "1,2"; SWIFT_EMIT_LOC_STRINGS = YES; }; name = Release; };
+ };
+ rootObject = A1000000000000000000000B;
+}
