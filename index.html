@@ -1,162 +1,24 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#101114">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="SunRise">
-  <title>SunRise</title>
-  <style>
-    * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; background: #101114; color: #f7f4ef; font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: max(28px, env(safe-area-inset-top)) 22px max(28px, env(safe-area-inset-bottom)); }
-    main { max-width: 520px; margin: auto; }
-    .top { display:flex; justify-content:space-between; align-items:center; }
-    .brand { font-size: 23px; font-weight: 700; letter-spacing: -.7px; }
-    .status { color:#9b9ba3; font-size:12px; }
-    .sun { margin: 54px auto 28px; width: 180px; height: 180px; border-radius: 50%; background: radial-gradient(circle at 50% 60%, #ffd98b 0%, #ff9b62 35%, #d94d4d 62%, #642f50 78%, #101114 79%); box-shadow: 0 0 70px #ff8b5430; }
-    .label { color:#a5a4ad; font-size:13px; text-transform:uppercase; letter-spacing:2px; }
-    .time { font-size:68px; font-weight:300; letter-spacing:-3px; margin:8px 0; }
-    .center { text-align:center; }
-    .card { margin-top:30px; padding:22px; border-radius:22px; background:#1b1c21; border:1px solid #303138; }
-    .alarm { display:flex; align-items:center; justify-content:space-between; gap:12px; }
-    .alarm strong { display:block; font-size:17px; margin-bottom:5px; }
-    .muted { color:#9b9ba3; font-size:13px; }
-    button { border:0; border-radius:14px; padding:13px 18px; background:#ffad72; color:#20130d; font-size:14px; font-weight:700; cursor:pointer; }
-    button:disabled { opacity:.6; cursor:wait; }
-    .secondary { background:#303138; color:#f7f4ef; }
-    .actions { display:flex; gap:10px; margin-top:18px; }
-    .actions button { flex:1; }
-    .note { color:#888891; font-size:12px; line-height:1.5; margin-top:20px; }
-    #message { color:#ffbd91; font-size:13px; line-height:1.5; margin-top:14px; overflow-wrap:anywhere; }
-    #details { color:#c6c5cc; font-size:12px; line-height:1.5; white-space:pre-wrap; overflow-wrap:anywhere; margin-top:10px; }
-    @media (max-width: 420px) { .actions { flex-direction:column; } .sun { margin-top:38px; } }
-  </style>
-</head>
-<body>
-  <main>
-    <header class="top">
-      <div class="brand">SunRise</div>
-      <div class="status" id="connectionStatus">NON CONNECTÉ</div>
-    </header>
-    <div class="sun" aria-hidden="true"></div>
-    <section class="center">
-      <div class="label">Heure actuelle</div>
-      <div class="time" id="clock">--:--</div>
-      <div class="muted">Un réveil plus naturel</div>
-    </section>
-    <section class="card">
-      <div class="alarm">
-        <div><strong>Mon réveil</strong><div class="muted">Heure de réveil</div></div>
-        <input id="alarmTime" type="time" value="07:00" aria-label="Heure de réveil" style="background:#303138;color:white;border:0;border-radius:10px;padding:10px;font-size:16px">
-      </div>
-      <div class="actions">
-        <button id="save">Enregistrer</button>
-        <button id="connect" class="secondary">Connexion Bluetooth</button>
-      </div>
-      <div id="message" role="status" aria-live="polite">Prêt à rechercher le réveil.</div>
-      <div id="details"></div>
-    </section>
-    <p class="note">SunRise Web BLE. La connexion et la détection des caractéristiques sont testées ici. Les commandes de réglage du réveil ne sont pas encore envoyées, car leur format doit être confirmé.</p>
-  </main>
-  <script>
-    const message = document.getElementById('message');
-    const details = document.getElementById('details');
-    const connectButton = document.getElementById('connect');
-    const connectionStatus = document.getElementById('connectionStatus');
-    let connectedDevice = null;
-    let gattServer = null;
-
-    function updateClock() {
-      document.getElementById('clock').textContent = new Intl.DateTimeFormat('fr-FR', {hour:'2-digit', minute:'2-digit'}).format(new Date());
-    }
-    updateClock();
-    setInterval(updateClock, 1000);
-
-    const input = document.getElementById('alarmTime');
-    const saved = localStorage.getItem('sunrise-alarm');
-    if (saved) input.value = saved;
-    document.getElementById('save').addEventListener('click', () => {
-      localStorage.setItem('sunrise-alarm', input.value);
-      message.textContent = 'Heure enregistrée localement : ' + input.value + '. Elle n’a pas encore été envoyée au réveil.';
-    });
-
-    function formatError(error) {
-      if (!error) return 'Erreur inconnue';
-      if (error.name === 'NotFoundError') return 'Aucun appareil sélectionné. Relance la recherche et sélectionne le réveil.';
-      if (error.name === 'NotSupportedError') return 'Cette version du navigateur ne prend pas en charge Web Bluetooth. Ouvre le site dans Bluefy.';
-      if (error.name === 'SecurityError') return 'Accès Bluetooth bloqué par le contexte de sécurité ou les autorisations du navigateur.';
-      if (error.name === 'NetworkError') return 'Connexion GATT impossible ou interrompue. Vérifie que le réveil est allumé et non connecté à une autre application.';
-      return (error.name ? error.name + ': ' : '') + error.message;
-    }
-
-    async function inspectDevice(device) {
-      message.textContent = 'Connexion à ' + (device.name || 'l’appareil sélectionné') + '…';
-      details.textContent = '';
-      device.addEventListener('gattserverdisconnected', () => {
-        gattServer = null;
-        connectionStatus.textContent = 'DÉCONNECTÉ';
-        message.textContent = 'La connexion Bluetooth a été interrompue.';
-      });
-      if (!device.gatt) throw new Error('Cet appareil ne fournit pas de connexion GATT.');
-      gattServer = await device.gatt.connect();
-      connectedDevice = device;
-      connectionStatus.textContent = 'CONNECTÉ';
-      message.textContent = 'Connecté à ' + (device.name || 'l’appareil') + '. Lecture des services…';
-
-      const services = await gattServer.getPrimaryServices();
-      const lines = [];
-      for (const service of services) {
-        lines.push('Service : ' + service.uuid);
-        let characteristics;
-        try {
-          characteristics = await service.getCharacteristics();
-        } catch (error) {
-          lines.push('  Lecture des caractéristiques impossible : ' + formatError(error));
-          continue;
-        }
-        for (const characteristic of characteristics) {
-          const p = characteristic.properties;
-          const caps = [];
-          if (p.read) caps.push('lecture');
-          if (p.write) caps.push('écriture');
-          if (p.writeWithoutResponse) caps.push('écriture sans réponse');
-          if (p.notify) caps.push('notifications');
-          if (p.indicate) caps.push('indications');
-          lines.push('  ' + characteristic.uuid + ' — ' + (caps.join(', ') || 'aucune propriété signalée'));
-        }
-      }
-      details.textContent = lines.join('\n');
-      message.textContent = 'Connexion établie. ' + services.length + ' service(s) principal(aux) détecté(s). Aucun ordre de contrôle n’a été envoyé.';
-    }
-
-    connectButton.addEventListener('click', async () => {
-      details.textContent = '';
-      if (!navigator.bluetooth || typeof navigator.bluetooth.requestDevice !== 'function') {
-        message.textContent = 'Web Bluetooth indisponible dans ce navigateur. Vérifie que cette page est ouverte dans Bluefy et recharge-la.';
-        return;
-      }
-      connectButton.disabled = true;
-      try {
-        if (connectedDevice && connectedDevice.gatt && connectedDevice.gatt.connected) {
-          connectedDevice.gatt.disconnect();
-          connectedDevice = null;
-          gattServer = null;
-          connectionStatus.textContent = 'NON CONNECTÉ';
-        }
-        message.textContent = 'Choisis le réveil dans la fenêtre Bluetooth…';
-        const device = await navigator.bluetooth.requestDevice({
-          filters: [{services: ['ae30']}, {services: ['ae3a']}, {services: ['af30']}],
-          optionalServices: ['ae30', 'ae3a', 'af30']
-        });
-        await inspectDevice(device);
-      } catch (error) {
-        message.textContent = 'Bluetooth : ' + formatError(error);
-      } finally {
-        connectButton.disabled = false;
-      }
-    });
-  </script>
-</body>
-</html>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101018"><title>SunRise — Diagnostic Bluetooth</title>
+<style>
+:root{color-scheme:dark;--bg:#101018;--panel:#1b1b27;--muted:#a7a7ba;--line:#343448;--accent:#ffad70;--ok:#75d7a4;--bad:#ff8888}*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 50% 0,#30203a 0,#101018 55%);color:#f7f3f8;font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:100vh}main{max-width:650px;margin:auto;padding:24px 16px 44px}.brand{text-align:center;letter-spacing:.2em;font-size:12px;color:var(--muted)}.sun{width:118px;height:118px;margin:22px auto 12px;border-radius:50%;background:linear-gradient(135deg,#ffe6a2,#ff9b62 55%,#d65b73);box-shadow:0 0 55px #ff9b6240}h1{text-align:center;font-size:30px;margin:8px 0 4px}.sub{text-align:center;color:var(--muted);margin:0 0 24px}.card{background:#1b1b27ef;border:1px solid var(--line);border-radius:18px;padding:18px;margin:14px 0}h2{font-size:17px;margin:0 0 12px}p{margin:8px 0}.small{font-size:13px;color:var(--muted)}.status{padding:10px 12px;background:#12121a;border:1px solid var(--line);border-radius:11px;overflow-wrap:anywhere;font-size:14px;white-space:pre-wrap}button,select{font:inherit;border-radius:12px;border:1px solid var(--line);padding:12px;background:#12121a;color:#fff;width:100%;margin:5px 0}button{background:linear-gradient(100deg,#ff9b62,#ffcf79);color:#21151a;font-weight:700;border:0;cursor:pointer}button.secondary{background:#292938;color:#f7f3f8;border:1px solid #44445a}button:disabled{opacity:.45}.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.good{color:var(--ok)}.bad{color:var(--bad)}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#101018;border:1px solid var(--line);border-radius:10px;padding:12px;max-height:300px;overflow:auto;font-size:12px}.hint{border-left:3px solid var(--accent);padding:8px 12px;color:#ddd1d8;font-size:13px}footer{text-align:center;color:var(--muted);font-size:12px;margin-top:20px}
+</style></head>
+<body><main><div class="brand">SUNRISE · BLE LAB</div><div class="sun"></div><h1>SunRise</h1><p class="sub">Diagnostic de connexion au réveil Bluetooth</p>
+<section class="card"><h2>1. État du navigateur</h2><div id="api" class="status">Vérification…</div><p class="small">Cette vérification distingue une API Bluetooth absente d’un réveil simplement non détecté.</p></section>
+<section class="card"><h2>2. Connexion</h2><div id="status" class="status">Non connecté. Ferme LightBlue avant de lancer la recherche.</div><button id="connect">Rechercher et connecter le réveil</button><div class="row"><button class="secondary" id="disconnect" disabled>Déconnecter</button><button class="secondary" id="inspect" disabled>Relire les services</button></div><p class="small">Le sélecteur Bluetooth doit proposer le réveil s’il est détectable et si Bluefy prend en charge l’API utilisée.</p></section>
+<section class="card"><h2>3. Services et caractéristiques</h2><div id="gatt" class="status">Aucune caractéristique lue.</div></section>
+<section class="card"><h2>4. Notifications</h2><select id="notifyChar"><option value="AE02">AE02 — notifications</option><option value="AE04">AE04 — notifications</option><option value="AE3C">AE3C — notifications (AE3A)</option><option value="AE05">AE05 — indications</option><option value="AE10">AE10 — lecture/notification éventuelle</option></select><button id="subscribe" class="secondary" disabled>Écouter les notifications</button></section>
+<section class="card"><h2>5. Lecture</h2><button id="read" class="secondary" disabled>Lire AE10 une fois</button><div class="hint">Aucune commande de réglage n’est envoyée. Le format et le routage des commandes doivent être confirmés avant toute écriture.</div></section>
+<section class="card"><h2>Journal de diagnostic</h2><div class="row"><button class="secondary" id="clear">Effacer</button><button class="secondary" id="copy">Copier le journal</button></div><pre id="log">Prêt.</pre></section><footer>SunRise · diagnostic Web Bluetooth · aucune donnée envoyée à un serveur</footer></main>
+<script>
+(()=>{'use strict';const $=id=>document.getElementById(id);const UUID={AE30:'0000ae30-0000-1000-8000-00805f9b34fb',AE3A:'0000ae3a-0000-1000-8000-00805f9b34fb',AF30:'0000af30-0000-1000-8000-00805f9b34fb'};const defs={AE01:'AE30',AE02:'AE30',AE03:'AE30',AE04:'AE30',AE05:'AE30',AE10:'AE30',AE3B:'AE3A',AE3C:'AE3A'};let device=null,server=null,services={},characteristics={},lines=[];function log(msg,data){const s=new Date().toLocaleTimeString()+' — '+msg+(data===undefined?'':'\n'+(typeof data==='string'?data:JSON.stringify(data)));lines.push(s);if(lines.length>160)lines=lines.slice(-160);$('log').textContent=lines.join('\n\n');$('log').scrollTop=$('log').scrollHeight}function setStatus(msg,good=false){$('status').textContent=msg;$('status').className='status '+(good?'good':'')}function full(id){return UUID[id]||'0000'+id.toLowerCase()+'-0000-1000-8000-00805f9b34fb'}function hex(v){return [...new Uint8Array(v.buffer,v.byteOffset,v.byteLength)].map(n=>n.toString(16).padStart(2,'0')).join(' ').toUpperCase()||'(vide)'}function buttons(on){$('disconnect').disabled=!on;$('inspect').disabled=!on;$('subscribe').disabled=!on;$('read').disabled=!on}
+function diagnose(){const secure=window.isSecureContext;const exists=!!(navigator&&navigator.bluetooth);const rows=['HTTPS / contexte sécurisé : '+(secure?'oui':'non'),'navigator.bluetooth : '+(exists?'présent':'ABSENT'),'Bluetooth permissions API : '+(navigator.permissions?'disponible':'non disponible'),'Navigateur : '+navigator.userAgent];if(!secure)rows.push('ERREUR : ouvrir la page en HTTPS.');if(!exists)rows.push('ERREUR : Bluefy ne fournit pas navigator.bluetooth dans cette page. La sélection de périphérique ne peut pas fonctionner avec cette API.');$('api').textContent=rows.join('\n');$('api').className='status '+(secure&&exists?'good':'bad');log('Diagnostic navigateur',rows);return secure&&exists}
+async function connect(){if(!diagnose()){setStatus('Bluetooth Web indisponible dans ce contexte. Voir le diagnostic ci-dessus.');return}try{$('connect').disabled=true;log('Ouverture du sélecteur Bluetooth…');device=await navigator.bluetooth.requestDevice({acceptAllDevices:true,optionalServices:[full('AE30'),full('AE3A'),full('AF30')]});device.addEventListener('gattserverdisconnected',()=>{setStatus('Déconnecté de '+(device?.name||'Sunrise'));buttons(false);server=null;services={};characteristics={};$('gatt').textContent='Déconnecté.';log('Événement GATT : périphérique déconnecté.')});setStatus('Connexion à '+(device.name||'périphérique sans nom')+'…');server=await device.gatt.connect();setStatus('Connecté à '+(device.name||'Sunrise'),true);buttons(true);log('Connexion réussie',{name:device.name||'(sans nom)',id:device.id});await inspect()}catch(e){setStatus('Échec : '+(e.message||e.name));log('Erreur Bluetooth',{name:e.name,message:e.message});}finally{$('connect').disabled=false}}
+async function inspect(){if(!server?.connected)return;const out=[];for(const s of ['AE30','AE3A','AF30']){try{const svc=await server.getPrimaryService(full(s));services[s]=svc;out.push('Service '+s);for(const c of await svc.getCharacteristics()){const short=Object.keys(defs).find(k=>full(k)===c.uuid)||c.uuid;characteristics[short]=c;const p=c.properties;out.push('  '+short+' — '+['read','write','writeWithoutResponse','notify','indicate'].filter(k=>p[k]).join(', ')+' ['+c.uuid+']')}}catch(e){out.push('Service '+s+' indisponible : '+e.message)}}$('gatt').textContent=out.join('\n');log('Inspection GATT',out)}
+async function read(){try{const c=characteristics.AE10||(await (services.AE30||await server.getPrimaryService(full('AE30'))).getCharacteristic(full('AE10')));const v=await c.readValue();log('Lecture AE10',hex(v))}catch(e){log('Échec lecture AE10',{name:e.name,message:e.message})}}
+async function subscribe(){const id=$('notifyChar').value;try{const c=characteristics[id]||(await (services[defs[id]]||await server.getPrimaryService(full(defs[id]))).getCharacteristic(full(id)));c.addEventListener('characteristicvaluechanged',ev=>log('Notification '+id,hex(ev.target.value)));await c.startNotifications();log('Écoute active sur '+id)}catch(e){log('Échec notifications '+id,{name:e.name,message:e.message})}}
+$('connect').addEventListener('click',connect);$('disconnect').addEventListener('click',()=>{if(device?.gatt?.connected)device.gatt.disconnect()});$('inspect').addEventListener('click',inspect);$('read').addEventListener('click',read);$('subscribe').addEventListener('click',subscribe);$('clear').addEventListener('click',()=>{lines=[];$('log').textContent='Journal effacé.'});$('copy').addEventListener('click',async()=>{try{await navigator.clipboard.writeText($('log').textContent);log('Journal copié.')}catch(e){log('Copie impossible : '+e.message)}});diagnose()})();
+</script></body></html>
