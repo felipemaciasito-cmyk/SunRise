@@ -1,0 +1,22 @@
+name: SunRise
+options:
+  bundleIdPrefix: com.stani
+  deploymentTarget:
+    iOS: "16.0"
+targets:
+  SunRise:
+    type: application
+    platform: iOS
+    sources:
+      - path: SunRiseApp.swift
+      - path: SunRiseBluetooth.swift
+    info:
+      properties:
+        CFBundleDisplayName: SunRise
+        NSBluetoothAlwaysUsageDescription: "SunRise utilise le Bluetooth pour se connecter à votre réveil lumineux."
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.stani.sunrise
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        GENERATE_INFOPLIST_FILE: YES
