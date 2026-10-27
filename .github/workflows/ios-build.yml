@@ -1,8 +1,11 @@
-name: iOS build
+name: SunRise iOS build
 
 on:
   push:
     branches: ["main", "master"]
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios-build.yml"
   workflow_dispatch:
 
 permissions:
@@ -12,7 +15,6 @@ permissions:
 jobs:
   build:
     runs-on: macos-15
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -20,26 +22,119 @@ jobs:
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 
-      - name: Build for iOS device
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate --spec project.yml
+
+      - name: Build unsigned iOS device app
+        working-directory: ios
         run: |
           xcodebuild \
             -project SunRise.xcodeproj \
             -scheme SunRise \
             -sdk iphoneos \
             -configuration Release \
-            -derivedDataPath build \
-            CODE_SIGNING_ALLOWED=NO
+            -derivedDataPath build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            build
 
-      - name: Package device build
+      - name: Package unsigned device build for inspection
         run: |
-          mkdir -p SunRise-device-build
-          cp -R build/Build/Products/Release-iphoneos/SunRise.app SunRise-device-build/
-          cd SunRise-device-build
-          zip -r "$GITHUB_WORKSPACE/SunRise-device.zip" SunRise.app
+          mkdir -p output
+          ditto -c -k --sequesterRsrc --keepParent ios/build/DerivedData/Build/Products/Release-iphoneos/SunRise.app output/SunRise-unsigned-device.zip
 
-      - name: Upload artifact
+      - name: Upload unsigned build
         uses: actions/upload-artifact@v4
         with:
-          name: SunRise-device-build
-          path: SunRise-device.zip
+          name: SunRise-unsigned-device-build
+          path: output/SunRise-unsigned-device.zip
+          retention-days: 14
+
+      - name: Check signing secrets
+        id: signing
+        shell: bash
+        env:
+          P12_BASE64: ${{ secrets.IOS_CERTIFICATE_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+          TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+        run: |
+          if [[ -n "$P12_BASE64" && -n "$P12_PASSWORD" && -n "$PROFILE_BASE64" && -n "$TEAM_ID" ]]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "Signing skipped: add all four documented GitHub Actions secrets to generate an installable IPA."
+          fi
+
+      - name: Import signing certificate and provisioning profile
+        if: steps.signing.outputs.available == 'true'
+        env:
+          P12_BASE64: ${{ secrets.IOS_CERTIFICATE_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/sunrise-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 24)"
+          echo "$P12_BASE64" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          echo "$PROFILE_BASE64" | base64 --decode > "$RUNNER_TEMP/profile.mobileprovision"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$RUNNER_TEMP/certificate.p12" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c 'Print UUID' /dev/stdin <<< "$(security cms -D -i "$RUNNER_TEMP/profile.mobileprovision")")
+          cp "$RUNNER_TEMP/profile.mobileprovision" "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
+
+      - name: Archive signed app
+        if: steps.signing.outputs.available == 'true'
+        working-directory: ios
+        env:
+          TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+        run: |
+          xcodebuild \
+            -project SunRise.xcodeproj \
+            -scheme SunRise \
+            -sdk iphoneos \
+            -configuration Release \
+            -archivePath "$RUNNER_TEMP/SunRise.xcarchive" \
+            -derivedDataPath build/SignedDerivedData \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            archive
+
+      - name: Export signed IPA
+        if: steps.signing.outputs.available == 'true'
+        env:
+          TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>ad-hoc</string>
+            <key>teamID</key><string>$TEAM_ID</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>compileBitcode</key><false/>
+            <key>destination</key><string>export</string>
+          </dict></plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/SunRise.xcarchive" \
+            -exportPath "$RUNNER_TEMP/SunRise-export" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist"
+          mkdir -p output
+          cp "$RUNNER_TEMP/SunRise-export/"*.ipa output/SunRise.ipa
+
+      - name: Upload signed IPA
+        if: steps.signing.outputs.available == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: SunRise-installable-IPA
+          path: output/SunRise.ipa
           retention-days: 14
