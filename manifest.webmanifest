@@ -1,0 +1,21 @@
+{
+  "id": "./",
+  "name": "SunRise — Réveil lumineux",
+  "short_name": "SunRise",
+  "description": "Contrôlez votre réveil lumineux SunRise.",
+  "lang": "fr-FR",
+  "start_url": "./?source=homescreen",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#171521",
+  "theme_color": "#171521",
+  "icons": [
+    {
+      "src": "./sunrise-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
