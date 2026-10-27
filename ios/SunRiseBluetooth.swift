@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 import CoreBluetooth
 
 /// Native BLE transport for the SunRise alarm. Uses Apple's CoreBluetooth API;
